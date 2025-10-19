@@ -2,7 +2,11 @@ package router
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -34,6 +38,18 @@ func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 		}
 	} else {
 		logger.Error("GCP Project ID not configured", "error", "GCP_PROJECT_ID environment variable not set")
+	}
+
+	// Create audio language detection service
+	var audioDetectionService *service.AudioLanguageDetectionService
+	if cfg.GeminiAPIKey != "" {
+		var err error
+		audioDetectionService, err = service.NewAudioLanguageDetectionService(cfg.GeminiAPIKey, logger)
+		if err != nil {
+			logger.Error("Failed to create audio language detection service", "error", err)
+		}
+	} else {
+		logger.Error("Gemini API Key not configured", "error", "GEMINI_API_KEY environment variable not set")
 	}
 
 	// Create Gin engine
@@ -110,6 +126,139 @@ func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 
 			c.JSON(http.StatusOK, response)
 		})
+
+		v1.POST("/audio-language-detect", func(c *gin.Context) {
+			// Check if audio detection service is available
+			if audioDetectionService == nil {
+				c.JSON(http.StatusServiceUnavailable, models.AudioLanguageDetectionError{
+					Error:   "Audio language detection service unavailable",
+					Message: "Gemini API service is not configured. Please set GEMINI_API_KEY environment variable.",
+					Code:    "SERVICE_UNAVAILABLE",
+				})
+				return
+			}
+
+			// Get the uploaded file
+			file, err := c.FormFile("audio_file")
+			if err != nil {
+				c.JSON(http.StatusBadRequest, models.AudioLanguageDetectionError{
+					Error:   "Invalid file upload",
+					Message: "Please upload an audio file with the field name 'audio_file'",
+					Code:    "INVALID_FILE",
+				})
+				return
+			}
+
+			// Validate file size (max 10MB)
+			if file.Size > 10*1024*1024 {
+				c.JSON(http.StatusBadRequest, models.AudioLanguageDetectionError{
+					Error:   "File too large",
+					Message: "Audio file size must be less than 10MB",
+					Code:    "FILE_TOO_LARGE",
+				})
+				return
+			}
+
+			// Validate file format
+			contentType := file.Header.Get("Content-Type")
+			supportedFormats := audioDetectionService.GetSupportedAudioFormats()
+			isValidFormat := false
+
+			// Check MIME type first
+			for _, format := range supportedFormats {
+				if contentType == format {
+					isValidFormat = true
+					break
+				}
+			}
+
+			// If MIME type validation fails, check file extension as fallback
+			if !isValidFormat {
+				fileExt := strings.ToLower(filepath.Ext(file.Filename))
+				supportedExtensions := []string{".wav", ".mp3", ".aiff", ".aac", ".ogg", ".flac"}
+				for _, ext := range supportedExtensions {
+					if fileExt == ext {
+						isValidFormat = true
+						break
+					}
+				}
+			}
+
+			if !isValidFormat {
+				c.JSON(http.StatusBadRequest, models.AudioLanguageDetectionError{
+					Error:   "Unsupported audio format",
+					Message: fmt.Sprintf("Supported formats: %v", supportedFormats),
+					Code:    "UNSUPPORTED_FORMAT",
+				})
+				return
+			}
+
+			// Save uploaded file temporarily
+			tempDir := "./temp"
+			if err := os.MkdirAll(tempDir, 0755); err != nil {
+				logger.Error("Failed to create temp directory", "error", err)
+				c.JSON(http.StatusInternalServerError, models.AudioLanguageDetectionError{
+					Error:   "Internal server error",
+					Message: "Failed to create temporary directory",
+					Code:    "TEMP_DIR_ERROR",
+				})
+				return
+			}
+
+			tempFilePath := fmt.Sprintf("%s/%s", tempDir, file.Filename)
+			if err := c.SaveUploadedFile(file, tempFilePath); err != nil {
+				logger.Error("Failed to save uploaded file", "error", err)
+				c.JSON(http.StatusInternalServerError, models.AudioLanguageDetectionError{
+					Error:   "Internal server error",
+					Message: "Failed to save uploaded file",
+					Code:    "FILE_SAVE_ERROR",
+				})
+				return
+			}
+
+			// Clean up temporary file after processing
+			defer func() {
+				if err := os.Remove(tempFilePath); err != nil {
+					logger.Error("Failed to remove temporary file", "error", err, "file", tempFilePath)
+				}
+			}()
+
+			// Validate the saved file
+			if err := audioDetectionService.ValidateAudioFile(tempFilePath); err != nil {
+				c.JSON(http.StatusBadRequest, models.AudioLanguageDetectionError{
+					Error:   "Invalid audio file",
+					Message: err.Error(),
+					Code:    "INVALID_AUDIO_FILE",
+				})
+				return
+			}
+
+			// Detect language using Gemini
+			ctx := context.Background()
+			detectedLanguage, err := audioDetectionService.DetectLanguage(ctx, tempFilePath)
+			if err != nil {
+				logger.Error("Audio language detection failed", "error", err)
+				c.JSON(http.StatusInternalServerError, models.AudioLanguageDetectionError{
+					Error:   "Language detection failed",
+					Message: "Unable to detect language from audio file. Please try again.",
+					Code:    "DETECTION_FAILED",
+				})
+				return
+			}
+
+			// Get language code
+			languageCode := audioDetectionService.GetLanguageCode(detectedLanguage)
+
+			// Return response
+			response := models.AudioLanguageDetectionResponse{
+				DetectedLanguage: detectedLanguage,
+				LanguageCode:     languageCode,
+				AudioFormat:      contentType,
+				FileSize:         file.Size,
+			}
+
+			c.JSON(http.StatusOK, response)
+		})
 	}
 
 	// Root endpoint
@@ -118,8 +267,9 @@ func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 			"message": "Welcome to ISL API Server",
 			"version": "1.0.0",
 			"endpoints": gin.H{
-				"health":         "/api/v1/health",
-				"text-translate": "/api/v1/text-translate",
+				"health":                "/api/v1/health",
+				"text-translate":        "/api/v1/text-translate",
+				"audio-language-detect": "/api/v1/audio-language-detect",
 			},
 		}
 		c.JSON(http.StatusOK, response)
