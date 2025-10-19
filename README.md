@@ -125,7 +125,12 @@ go mod tidy
 ```
 
 ### 3. Configure Environment
-Create a `.env` file in the project root:
+Copy the configuration template and create a `.env` file:
+```bash
+cp config.env.template .env
+```
+
+Update the `.env` file with your values:
 ```bash
 # GCP Configuration
 GCP_PROJECT_ID=your-project-id
@@ -135,6 +140,9 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 PORT=5001
 ENVIRONMENT=development
 LOG_PATH=./log/isl-api-server.log
+
+# Language Dictionary Configuration
+LANGUAGE_DICTIONARY_PATH=./config/language_dictionary
 
 # Timeout Configuration
 READ_TIMEOUT=10
@@ -170,6 +178,7 @@ go build -o isl-api-server cmd/server/main.go
 | `PORT` | Server port | 5001 |
 | `ENVIRONMENT` | Environment (development/production) | development |
 | `LOG_PATH` | Log file path | ./log/isl-api-server.log |
+| `LANGUAGE_DICTIONARY_PATH` | Path to language dictionary files | ./config/language_dictionary |
 | `READ_TIMEOUT` | HTTP read timeout (seconds) | 10 |
 | `WRITE_TIMEOUT` | HTTP write timeout (seconds) | 10 |
 | `IDLE_TIMEOUT` | HTTP idle timeout (seconds) | 120 |

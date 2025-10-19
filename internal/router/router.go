@@ -28,7 +28,7 @@ func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 	var translationService *service.TranslationService
 	if cfg.GCPProjectID != "" {
 		var err error
-		translationService, err = service.NewTranslationService(cfg.GCPProjectID, logger)
+		translationService, err = service.NewTranslationService(cfg.GCPProjectID, cfg.LanguageDictionaryPath, logger)
 		if err != nil {
 			logger.Error("Failed to create translation service", "error", err)
 		}

@@ -2,8 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,11 +16,19 @@ import (
 	"google.golang.org/api/option"
 )
 
+// NumbersDictionary represents the numbers dictionary structure
+type NumbersDictionary struct {
+	Metadata map[string]interface{}       `json:"metadata"`
+	Numbers  map[string]map[string]string `json:"numbers"`
+}
+
 // TranslationService handles GCP Translation API operations
 type TranslationService struct {
-	client    *translate.TranslationClient
-	projectID string
-	logger    Logger
+	client         *translate.TranslationClient
+	projectID      string
+	logger         Logger
+	numbersDict    *NumbersDictionary
+	dictionaryPath string
 }
 
 // Logger interface for logging
@@ -26,7 +38,7 @@ type Logger interface {
 }
 
 // NewTranslationService creates a new translation service
-func NewTranslationService(projectID string, logger Logger) (*TranslationService, error) {
+func NewTranslationService(projectID string, dictionaryPath string, logger Logger) (*TranslationService, error) {
 	ctx := context.Background()
 
 	// Get credentials path from environment variable
@@ -46,12 +58,21 @@ func NewTranslationService(projectID string, logger Logger) (*TranslationService
 		return nil, fmt.Errorf("failed to create translation client: %w", err)
 	}
 
-	logger.Info("Translation service initialized", "project_id", projectID)
+	// Load numbers dictionary
+	numbersDict, err := loadNumbersDictionary(dictionaryPath, logger)
+	if err != nil {
+		logger.Error("Failed to load numbers dictionary", "error", err)
+		// Continue without dictionary - service will work but without number translation
+	}
+
+	logger.Info("Translation service initialized", "project_id", projectID, "dictionary_path", dictionaryPath)
 
 	return &TranslationService{
-		client:    client,
-		projectID: projectID,
-		logger:    logger,
+		client:         client,
+		projectID:      projectID,
+		logger:         logger,
+		numbersDict:    numbersDict,
+		dictionaryPath: dictionaryPath,
 	}, nil
 }
 
@@ -108,7 +129,10 @@ func (t *TranslationService) TranslateToMultipleLanguagesConcurrent(ctx context.
 			translationCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
 
-			translatedText, err := t.TranslateText(translationCtx, text, sourceLang, lang)
+			// Convert numbers to words before translation
+			processedText := t.convertNumbersToWords(text, lang)
+
+			translatedText, err := t.TranslateText(translationCtx, processedText, sourceLang, lang)
 
 			// Thread-safe access to shared data
 			mu.Lock()
@@ -145,4 +169,68 @@ func (t *TranslationService) TranslateToMultipleLanguagesConcurrent(ctx context.
 
 	t.logger.Info("Concurrent multi-language translation completed", "source", sourceLang, "translations_count", len(translations), "errors_count", len(errors))
 	return translations, nil
+}
+
+// loadNumbersDictionary loads the numbers dictionary from file
+func loadNumbersDictionary(dictionaryPath string, logger Logger) (*NumbersDictionary, error) {
+	numbersFilePath := fmt.Sprintf("%s/numbers.json", dictionaryPath)
+
+	// Check if file exists
+	if _, err := os.Stat(numbersFilePath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("numbers dictionary file not found: %s", numbersFilePath)
+	}
+
+	// Read file
+	data, err := ioutil.ReadFile(numbersFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read numbers dictionary file: %w", err)
+	}
+
+	// Parse JSON
+	var numbersDict NumbersDictionary
+	if err := json.Unmarshal(data, &numbersDict); err != nil {
+		return nil, fmt.Errorf("failed to parse numbers dictionary JSON: %w", err)
+	}
+
+	logger.Info("Numbers dictionary loaded successfully", "file", numbersFilePath, "numbers_count", len(numbersDict.Numbers))
+	return &numbersDict, nil
+}
+
+// convertNumbersToWords converts numeric digits in text to words using dictionary
+func (t *TranslationService) convertNumbersToWords(text, targetLang string) string {
+	if t.numbersDict == nil {
+		// No dictionary available, return original text
+		return text
+	}
+
+	// Find all numbers in text
+	numberRegex := regexp.MustCompile(`\b\d+\b`)
+	numbers := numberRegex.FindAllString(text, -1)
+
+	// Convert each number
+	for _, number := range numbers {
+		// Split number into individual digits
+		digits := strings.Split(number, "")
+		var digitWords []string
+
+		// Convert each digit to word
+		for _, digit := range digits {
+			if word, exists := t.numbersDict.Numbers[digit][targetLang]; exists {
+				digitWords = append(digitWords, word)
+			} else {
+				// If digit not found in dictionary, keep original digit
+				digitWords = append(digitWords, digit)
+			}
+		}
+
+		// Join digit words with spaces
+		numberWords := strings.Join(digitWords, " ")
+
+		// Replace number in text
+		text = strings.Replace(text, number, numberWords, -1)
+
+		t.logger.Info("Number converted", "original", number, "converted", numberWords, "target_lang", targetLang)
+	}
+
+	return text
 }

@@ -10,14 +10,15 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Port         int    `json:"port"`
-	Environment  string `json:"environment"`
-	ReadTimeout  int    `json:"read_timeout"`
-	WriteTimeout int    `json:"write_timeout"`
-	IdleTimeout  int    `json:"idle_timeout"`
-	GCPProjectID string `json:"gcp_project_id"`
-	LogPath      string `json:"log_path"`
-	GeminiAPIKey string `json:"gemini_api_key"`
+	Port                   int    `json:"port"`
+	Environment            string `json:"environment"`
+	ReadTimeout            int    `json:"read_timeout"`
+	WriteTimeout           int    `json:"write_timeout"`
+	IdleTimeout            int    `json:"idle_timeout"`
+	GCPProjectID           string `json:"gcp_project_id"`
+	LogPath                string `json:"log_path"`
+	LanguageDictionaryPath string `json:"language_dictionary_path"`
+	GeminiAPIKey           string `json:"gemini_api_key"`
 }
 
 // Load loads configuration from environment variables and .env file
@@ -28,14 +29,15 @@ func Load() (*Config, error) {
 	}
 
 	config := &Config{
-		Port:         getEnvAsInt("PORT", 5001),
-		Environment:  getEnv("ENVIRONMENT", "development"),
-		ReadTimeout:  getEnvAsInt("READ_TIMEOUT", 10),
-		WriteTimeout: getEnvAsInt("WRITE_TIMEOUT", 10),
-		IdleTimeout:  getEnvAsInt("IDLE_TIMEOUT", 120),
-		GCPProjectID: getEnv("GCP_PROJECT_ID", ""),
-		LogPath:      getEnv("LOG_PATH", "./log/isl-api-server.log"),
-		GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
+		Port:                   getEnvAsInt("PORT", 5001),
+		Environment:            getEnv("ENVIRONMENT", "development"),
+		ReadTimeout:            getEnvAsInt("READ_TIMEOUT", 10),
+		WriteTimeout:           getEnvAsInt("WRITE_TIMEOUT", 10),
+		IdleTimeout:            getEnvAsInt("IDLE_TIMEOUT", 120),
+		GCPProjectID:           getEnv("GCP_PROJECT_ID", ""),
+		LogPath:                getEnv("LOG_PATH", "./log/isl-api-server.log"),
+		LanguageDictionaryPath: getEnv("LANGUAGE_DICTIONARY_PATH", "./config/language_dictionary"),
+		GeminiAPIKey:           getEnv("GEMINI_API_KEY", ""),
 	}
 
 	return config, nil
