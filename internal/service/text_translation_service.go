@@ -22,12 +22,19 @@ type NumbersDictionary struct {
 	Numbers  map[string]map[string]string `json:"numbers"`
 }
 
+// TrainNamesDictionary represents the train names dictionary structure
+type TrainNamesDictionary struct {
+	Metadata   map[string]interface{}       `json:"metadata"`
+	TrainNames map[string]map[string]string `json:"train_names"`
+}
+
 // TranslationService handles GCP Translation API operations
 type TranslationService struct {
 	client         *translate.TranslationClient
 	projectID      string
 	logger         Logger
 	numbersDict    *NumbersDictionary
+	trainNamesDict *TrainNamesDictionary
 	dictionaryPath string
 }
 
@@ -65,6 +72,13 @@ func NewTranslationService(projectID string, dictionaryPath string, logger Logge
 		// Continue without dictionary - service will work but without number translation
 	}
 
+	// Load train names dictionary
+	trainNamesDict, err := loadTrainNamesDictionary(dictionaryPath, logger)
+	if err != nil {
+		logger.Error("Failed to load train names dictionary", "error", err)
+		// Continue without dictionary - service will work but without train name correction
+	}
+
 	logger.Info("Translation service initialized", "project_id", projectID, "dictionary_path", dictionaryPath)
 
 	return &TranslationService{
@@ -72,6 +86,7 @@ func NewTranslationService(projectID string, dictionaryPath string, logger Logge
 		projectID:      projectID,
 		logger:         logger,
 		numbersDict:    numbersDict,
+		trainNamesDict: trainNamesDict,
 		dictionaryPath: dictionaryPath,
 	}, nil
 }
@@ -133,6 +148,11 @@ func (t *TranslationService) TranslateToMultipleLanguagesConcurrent(ctx context.
 			processedText := t.convertNumbersToWords(text, lang)
 
 			translatedText, err := t.TranslateText(translationCtx, processedText, sourceLang, lang)
+
+			// Apply train name correction after translation
+			if err == nil {
+				translatedText = t.correctTrainNames(translatedText, lang)
+			}
 
 			// Thread-safe access to shared data
 			mu.Lock()
@@ -196,6 +216,31 @@ func loadNumbersDictionary(dictionaryPath string, logger Logger) (*NumbersDictio
 	return &numbersDict, nil
 }
 
+// loadTrainNamesDictionary loads the train names dictionary from file
+func loadTrainNamesDictionary(dictionaryPath string, logger Logger) (*TrainNamesDictionary, error) {
+	trainNamesFilePath := fmt.Sprintf("%s/train_names.json", dictionaryPath)
+
+	// Check if file exists
+	if _, err := os.Stat(trainNamesFilePath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("train names dictionary file not found: %s", trainNamesFilePath)
+	}
+
+	// Read file
+	data, err := os.ReadFile(trainNamesFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read train names dictionary file: %w", err)
+	}
+
+	// Parse JSON
+	var trainNamesDict TrainNamesDictionary
+	if err := json.Unmarshal(data, &trainNamesDict); err != nil {
+		return nil, fmt.Errorf("failed to parse train names dictionary JSON: %w", err)
+	}
+
+	logger.Info("Train names dictionary loaded successfully", "file", trainNamesFilePath, "train_names_count", len(trainNamesDict.TrainNames))
+	return &trainNamesDict, nil
+}
+
 // convertNumbersToWords converts numeric digits in text to words using dictionary
 func (t *TranslationService) convertNumbersToWords(text, targetLang string) string {
 	if t.numbersDict == nil {
@@ -233,4 +278,59 @@ func (t *TranslationService) convertNumbersToWords(text, targetLang string) stri
 	}
 
 	return text
+}
+
+// correctTrainNames corrects train names using the dictionary
+func (t *TranslationService) correctTrainNames(text, targetLang string) string {
+	if t.trainNamesDict == nil {
+		// No dictionary available, return original text
+		return text
+	}
+
+	// Convert language code from full format (en-IN) to short format (en)
+	shortLang := t.convertLanguageCodeToShort(targetLang)
+
+	// Check for each train name in the dictionary
+	for trainName, translations := range t.trainNamesDict.TrainNames {
+		// Check if the English train name exists in the text
+		if strings.Contains(strings.ToLower(text), strings.ToLower(trainName)) {
+			// Get the correct translation for the target language
+			if correctName, exists := translations[shortLang]; exists {
+				// Replace the train name with the correct translation
+				text = strings.Replace(text, trainName, correctName, -1)
+				t.logger.Info("Train name corrected", "original", trainName, "corrected", correctName, "target_lang", targetLang)
+			}
+		}
+
+		// Also check for translated train names in the text (for cases where original text contains translated names)
+		for lang, translatedName := range translations {
+			if lang != shortLang && strings.Contains(strings.ToLower(text), strings.ToLower(translatedName)) {
+				// Get the correct translation for the target language
+				if correctName, exists := translations[shortLang]; exists {
+					// Replace the translated train name with the correct translation
+					text = strings.Replace(text, translatedName, correctName, -1)
+					t.logger.Info("Train name corrected from translation", "original", translatedName, "corrected", correctName, "target_lang", targetLang)
+				}
+			}
+		}
+	}
+
+	return text
+}
+
+// convertLanguageCodeToShort converts full language codes to short format for dictionary lookup
+func (t *TranslationService) convertLanguageCodeToShort(langCode string) string {
+	switch langCode {
+	case "en-IN":
+		return "en"
+	case "hi-IN":
+		return "hi"
+	case "mr-IN":
+		return "mr"
+	case "gu-IN":
+		return "gu"
+	default:
+		// Default to English if language not recognized
+		return "en"
+	}
 }

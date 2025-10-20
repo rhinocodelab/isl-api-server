@@ -26,6 +26,62 @@ func generateUniqueFileName(originalName string) string {
 	return fmt.Sprintf("%s_%d%s", name, timestamp, ext)
 }
 
+// applyTrainNameCorrection applies train name correction to text
+func applyTrainNameCorrection(text, languageCode string) string {
+	// Train names mapping
+	trainNames := map[string]map[string]string{
+		"Tata": {
+			"en-IN": "Tejas",
+			"hi-IN": "तेजस",
+			"mr-IN": "तेजस",
+			"gu-IN": "તેજસ",
+		},
+		"टाटा": {
+			"en-IN": "Tejas",
+			"hi-IN": "तेजस",
+			"mr-IN": "तेजस",
+			"gu-IN": "તેજસ",
+		},
+		"ટાટા": {
+			"en-IN": "Tejas",
+			"hi-IN": "तेजस",
+			"mr-IN": "तेजस",
+			"gu-IN": "તેજસ",
+		},
+		"टेटस": {
+			"en-IN": "Tejas",
+			"hi-IN": "तेजस",
+			"mr-IN": "तेजस",
+			"gu-IN": "તેજસ",
+		},
+	}
+
+	// Apply corrections
+	for trainName, translations := range trainNames {
+		// Check if the train name exists in the text
+		if strings.Contains(strings.ToLower(text), strings.ToLower(trainName)) {
+			// Get the correct translation for the target language
+			if correctName, exists := translations[languageCode]; exists {
+				// Replace the train name with the correct translation
+				text = strings.Replace(text, trainName, correctName, -1)
+			}
+		}
+
+		// Also check for translated train names in the text
+		for lang, translatedName := range translations {
+			if lang != languageCode && strings.Contains(strings.ToLower(text), strings.ToLower(translatedName)) {
+				// Get the correct translation for the target language
+				if correctName, exists := translations[languageCode]; exists {
+					// Replace the translated train name with the correct translation
+					text = strings.Replace(text, translatedName, correctName, -1)
+				}
+			}
+		}
+	}
+
+	return text
+}
+
 // NewRouter creates a new router instance
 func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 	// Set Gin mode based on environment
@@ -450,14 +506,23 @@ func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 				translations = make(map[string]string)
 			}
 
+			// Apply final train name correction to original transcript
+			correctedTranscript := applyTrainNameCorrection(transcript, languageCode)
+
+			// Apply final train name correction to all translations
+			correctedTranslations := make(map[string]string)
+			for lang, translation := range translations {
+				correctedTranslations[lang] = applyTrainNameCorrection(translation, lang)
+			}
+
 			// Return response
 			response := models.SpeechToTextResponse{
-				OriginalTranscript: transcript,
+				OriginalTranscript: correctedTranscript,
 				OriginalLanguage:   languageCode,
 				SampleRate:         sampleRate,
 				AudioFormat:        contentType,
 				FileSize:           file.Size,
-				Translations:       translations,
+				Translations:       correctedTranslations,
 			}
 
 			c.JSON(http.StatusOK, response)

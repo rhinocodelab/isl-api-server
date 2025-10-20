@@ -154,6 +154,7 @@ type SpeechToTextService struct {
 	projectID      string
 	logger         Logger
 	numbersDict    *SpeechNumbersDictionary
+	trainNamesDict *SpeechNumbersDictionary
 	dictionaryPath string
 	rateLimiter    *RateLimiter
 	requestQueue   *RequestQueue
@@ -174,6 +175,13 @@ func NewSpeechToTextService(projectID string, dictionaryPath string, logger Logg
 		// Continue without dictionary - service will work but without number translation
 	}
 
+	// Load train names dictionary
+	trainNamesDict, err := loadSpeechTrainNamesDictionary(dictionaryPath, logger)
+	if err != nil {
+		logger.Error("Failed to load train names dictionary", "error", err)
+		// Continue without dictionary - service will work but without train name correction
+	}
+
 	// Initialize rate limiter (5 requests per second, max 10 tokens)
 	rateLimiter := NewRateLimiter(10, 200*time.Millisecond) // 5 requests per second
 
@@ -183,6 +191,7 @@ func NewSpeechToTextService(projectID string, dictionaryPath string, logger Logg
 		projectID:      projectID,
 		logger:         logger,
 		numbersDict:    numbersDict,
+		trainNamesDict: trainNamesDict,
 		dictionaryPath: dictionaryPath,
 		rateLimiter:    rateLimiter,
 	}
@@ -304,6 +313,9 @@ func (s *SpeechToTextService) TranscribeAudio(ctx context.Context, filePath, lan
 	// Convert numbers to words in the original transcript
 	processedTranscript := s.convertNumbersToWords(transcript, languageCode)
 
+	// Apply train name correction to the original transcript
+	processedTranscript = s.correctTrainNames(processedTranscript, languageCode)
+
 	processingTime := time.Since(startTime)
 	s.logger.Info("Speech-to-text transcription completed",
 		"transcript_length", len(processedTranscript),
@@ -375,6 +387,9 @@ func (s *SpeechToTextService) TranscribeAudioStream(ctx context.Context, filePat
 
 	// Convert numbers to words in the original transcript
 	processedTranscript := s.convertNumbersToWords(transcript, languageCode)
+
+	// Apply train name correction to the original transcript
+	processedTranscript = s.correctTrainNames(processedTranscript, languageCode)
 
 	processingTime := time.Since(startTime)
 	s.logger.Info("Streaming speech-to-text transcription completed",
@@ -577,6 +592,31 @@ func loadSpeechNumbersDictionary(dictionaryPath string, logger Logger) (*SpeechN
 	return &numbersDict, nil
 }
 
+// loadSpeechTrainNamesDictionary loads the train names dictionary from file
+func loadSpeechTrainNamesDictionary(dictionaryPath string, logger Logger) (*SpeechNumbersDictionary, error) {
+	trainNamesFilePath := fmt.Sprintf("%s/train_names.json", dictionaryPath)
+
+	// Check if file exists
+	if _, err := os.Stat(trainNamesFilePath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("train names dictionary file not found: %s", trainNamesFilePath)
+	}
+
+	// Read file
+	data, err := os.ReadFile(trainNamesFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read train names dictionary file: %w", err)
+	}
+
+	// Parse JSON
+	var trainNamesDict SpeechNumbersDictionary
+	if err := json.Unmarshal(data, &trainNamesDict); err != nil {
+		return nil, fmt.Errorf("failed to parse train names dictionary JSON: %w", err)
+	}
+
+	logger.Info("Train names dictionary loaded successfully", "file", trainNamesFilePath, "train_names_count", len(trainNamesDict.Numbers))
+	return &trainNamesDict, nil
+}
+
 // convertNumbersToWords converts numeric digits in text to words using dictionary
 func (s *SpeechToTextService) convertNumbersToWords(text, targetLang string) string {
 	if s.numbersDict == nil {
@@ -614,6 +654,44 @@ func (s *SpeechToTextService) convertNumbersToWords(text, targetLang string) str
 		text = strings.Replace(text, number, numberWords, -1)
 
 		s.logger.Info("Number converted", "original", number, "converted", numberWords, "target_lang", targetLang, "short_lang", shortLang)
+	}
+
+	return text
+}
+
+// correctTrainNames corrects train names using the dictionary
+func (s *SpeechToTextService) correctTrainNames(text, targetLang string) string {
+	if s.trainNamesDict == nil {
+		// No dictionary available, return original text
+		return text
+	}
+
+	// Convert language code from full format (en-IN) to short format (en)
+	shortLang := s.convertLanguageCodeToShort(targetLang)
+
+	// Check for each train name in the dictionary
+	for trainName, translations := range s.trainNamesDict.Numbers {
+		// Check if the English train name exists in the text
+		if strings.Contains(strings.ToLower(text), strings.ToLower(trainName)) {
+			// Get the correct translation for the target language
+			if correctName, exists := translations[shortLang]; exists {
+				// Replace the train name with the correct translation
+				text = strings.Replace(text, trainName, correctName, -1)
+				s.logger.Info("Train name corrected in original transcript", "original", trainName, "corrected", correctName, "target_lang", targetLang)
+			}
+		}
+
+		// Also check for translated train names in the text (for cases where original text contains translated names)
+		for lang, translatedName := range translations {
+			if lang != shortLang && strings.Contains(strings.ToLower(text), strings.ToLower(translatedName)) {
+				// Get the correct translation for the target language
+				if correctName, exists := translations[shortLang]; exists {
+					// Replace the translated train name with the correct translation
+					text = strings.Replace(text, translatedName, correctName, -1)
+					s.logger.Info("Train name corrected from translation in original transcript", "original", translatedName, "corrected", correctName, "target_lang", targetLang)
+				}
+			}
+		}
 	}
 
 	return text
