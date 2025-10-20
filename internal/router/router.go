@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -16,6 +17,14 @@ import (
 	"isl-api-server/internal/service"
 	"isl-api-server/internal/util"
 )
+
+// generateUniqueFileName generates a unique filename to prevent collisions
+func generateUniqueFileName(originalName string) string {
+	timestamp := time.Now().UnixNano()
+	ext := filepath.Ext(originalName)
+	name := strings.TrimSuffix(originalName, ext)
+	return fmt.Sprintf("%s_%d%s", name, timestamp, ext)
+}
 
 // NewRouter creates a new router instance
 func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
@@ -50,6 +59,18 @@ func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 		}
 	} else {
 		logger.Error("Gemini API Key not configured", "error", "GEMINI_API_KEY environment variable not set")
+	}
+
+	// Create speech-to-text service
+	var speechToTextService *service.SpeechToTextService
+	if cfg.GCPProjectID != "" {
+		var err error
+		speechToTextService, err = service.NewSpeechToTextService(cfg.GCPProjectID, cfg.LanguageDictionaryPath, logger)
+		if err != nil {
+			logger.Error("Failed to create speech-to-text service", "error", err)
+		}
+	} else {
+		logger.Error("GCP Project ID not configured for speech-to-text", "error", "GCP_PROJECT_ID environment variable not set")
 	}
 
 	// Create Gin engine
@@ -205,7 +226,9 @@ func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 				return
 			}
 
-			tempFilePath := fmt.Sprintf("%s/%s", tempDir, file.Filename)
+			// Generate unique filename to prevent collisions
+			uniqueFileName := generateUniqueFileName(file.Filename)
+			tempFilePath := fmt.Sprintf("%s/%s", tempDir, uniqueFileName)
 			if err := c.SaveUploadedFile(file, tempFilePath); err != nil {
 				logger.Error("Failed to save uploaded file", "error", err)
 				c.JSON(http.StatusInternalServerError, models.AudioLanguageDetectionError{
@@ -259,6 +282,186 @@ func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 
 			c.JSON(http.StatusOK, response)
 		})
+
+		v1.POST("/speech-to-text", func(c *gin.Context) {
+			// Check if speech-to-text service is available
+			if speechToTextService == nil {
+				c.JSON(http.StatusServiceUnavailable, models.SpeechToTextError{
+					Error:   "Speech-to-text service unavailable",
+					Message: "GCP Speech-to-Text service is not configured. Please set GCP_PROJECT_ID environment variable.",
+					Code:    "SERVICE_UNAVAILABLE",
+				})
+				return
+			}
+
+			// Check if translation service is available
+			if translationService == nil {
+				c.JSON(http.StatusServiceUnavailable, models.SpeechToTextError{
+					Error:   "Translation service unavailable",
+					Message: "GCP Translation service is not configured. Please set GCP_PROJECT_ID environment variable.",
+					Code:    "TRANSLATION_SERVICE_UNAVAILABLE",
+				})
+				return
+			}
+
+			// Get the uploaded file
+			file, err := c.FormFile("audio_file")
+			if err != nil {
+				c.JSON(http.StatusBadRequest, models.SpeechToTextError{
+					Error:   "Invalid file upload",
+					Message: "Please upload an audio file with the field name 'audio_file'",
+					Code:    "INVALID_FILE",
+				})
+				return
+			}
+
+			// Get language code from form
+			languageCode := c.PostForm("language_code")
+			if languageCode == "" {
+				c.JSON(http.StatusBadRequest, models.SpeechToTextError{
+					Error:   "Missing language code",
+					Message: "Please provide language_code in the form data",
+					Code:    "MISSING_LANGUAGE_CODE",
+				})
+				return
+			}
+
+			// Validate language code
+			if !speechToTextService.ValidateLanguageCode(languageCode) {
+				c.JSON(http.StatusBadRequest, models.SpeechToTextError{
+					Error:   "Invalid language code",
+					Message: "Language code must be one of: en-IN, hi-IN, mr-IN, gu-IN",
+					Code:    "INVALID_LANGUAGE_CODE",
+				})
+				return
+			}
+
+			// Validate file size (max 10MB)
+			if file.Size > 10*1024*1024 {
+				c.JSON(http.StatusBadRequest, models.SpeechToTextError{
+					Error:   "File too large",
+					Message: "Audio file size must be less than 10MB",
+					Code:    "FILE_TOO_LARGE",
+				})
+				return
+			}
+
+			// Validate file format
+			contentType := file.Header.Get("Content-Type")
+			supportedFormats := []string{"audio/wav", "audio/mp3", "audio/aiff", "audio/aac", "audio/ogg", "audio/flac"}
+			isValidFormat := false
+
+			// Check MIME type first
+			for _, format := range supportedFormats {
+				if contentType == format {
+					isValidFormat = true
+					break
+				}
+			}
+
+			// If MIME type validation fails, check file extension as fallback
+			if !isValidFormat {
+				fileExt := strings.ToLower(filepath.Ext(file.Filename))
+				supportedExtensions := []string{".wav", ".mp3", ".aiff", ".aac", ".ogg", ".flac"}
+				for _, ext := range supportedExtensions {
+					if fileExt == ext {
+						isValidFormat = true
+						break
+					}
+				}
+			}
+
+			if !isValidFormat {
+				c.JSON(http.StatusBadRequest, models.SpeechToTextError{
+					Error:   "Unsupported audio format",
+					Message: fmt.Sprintf("Supported formats: %v", supportedFormats),
+					Code:    "UNSUPPORTED_FORMAT",
+				})
+				return
+			}
+
+			// Save uploaded file temporarily
+			tempDir := "./temp"
+			if err := os.MkdirAll(tempDir, 0755); err != nil {
+				logger.Error("Failed to create temp directory", "error", err)
+				c.JSON(http.StatusInternalServerError, models.SpeechToTextError{
+					Error:   "Internal server error",
+					Message: "Failed to create temporary directory",
+					Code:    "TEMP_DIR_ERROR",
+				})
+				return
+			}
+
+			// Generate unique filename to prevent collisions
+			uniqueFileName := generateUniqueFileName(file.Filename)
+			tempFilePath := fmt.Sprintf("%s/%s", tempDir, uniqueFileName)
+			if err := c.SaveUploadedFile(file, tempFilePath); err != nil {
+				logger.Error("Failed to save uploaded file", "error", err)
+				c.JSON(http.StatusInternalServerError, models.SpeechToTextError{
+					Error:   "Internal server error",
+					Message: "Failed to save uploaded file",
+					Code:    "FILE_SAVE_ERROR",
+				})
+				return
+			}
+
+			// Clean up temporary file after processing
+			defer func() {
+				if err := os.Remove(tempFilePath); err != nil {
+					logger.Error("Failed to remove temporary file", "error", err, "file", tempFilePath)
+				}
+			}()
+
+			// Detect sample rate
+			sampleRate, err := speechToTextService.DetectSampleRate(tempFilePath)
+			if err != nil {
+				logger.Error("Failed to detect sample rate", "error", err)
+				// Continue with default sample rate
+				sampleRate = 16000
+			}
+
+			// Transcribe audio to text
+			ctx := context.Background()
+			transcript, err := speechToTextService.TranscribeAudio(ctx, tempFilePath, languageCode)
+			if err != nil {
+				logger.Error("Speech-to-text transcription failed", "error", err)
+				c.JSON(http.StatusInternalServerError, models.SpeechToTextError{
+					Error:   "Transcription failed",
+					Message: "Unable to transcribe audio. Please try again.",
+					Code:    "TRANSCRIPTION_FAILED",
+				})
+				return
+			}
+
+			// Get target languages for translation (all except the original)
+			allLanguages := []string{"en-IN", "hi-IN", "mr-IN", "gu-IN"}
+			var targetLanguages []string
+			for _, lang := range allLanguages {
+				if lang != languageCode {
+					targetLanguages = append(targetLanguages, lang)
+				}
+			}
+
+			// Translate transcript to other languages
+			translations, err := translationService.TranslateToMultipleLanguagesConcurrent(ctx, transcript, languageCode, targetLanguages)
+			if err != nil {
+				logger.Error("Translation failed", "error", err)
+				// Return partial results if translation fails
+				translations = make(map[string]string)
+			}
+
+			// Return response
+			response := models.SpeechToTextResponse{
+				OriginalTranscript: transcript,
+				OriginalLanguage:   languageCode,
+				SampleRate:         sampleRate,
+				AudioFormat:        contentType,
+				FileSize:           file.Size,
+				Translations:       translations,
+			}
+
+			c.JSON(http.StatusOK, response)
+		})
 	}
 
 	// Root endpoint
@@ -270,6 +473,7 @@ func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 				"health":                "/api/v1/health",
 				"text-translate":        "/api/v1/text-translate",
 				"audio-language-detect": "/api/v1/audio-language-detect",
+				"speech-to-text":        "/api/v1/speech-to-text",
 			},
 		}
 		c.JSON(http.StatusOK, response)
