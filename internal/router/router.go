@@ -129,6 +129,18 @@ func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 		logger.Error("GCP Project ID not configured for speech-to-text", "error", "GCP_PROJECT_ID environment variable not set")
 	}
 
+	// Create text-to-speech service
+	var textToSpeechService *service.TextToSpeechService
+	if cfg.GCPProjectID != "" {
+		var err error
+		textToSpeechService, err = service.NewTextToSpeechService(cfg.GCPProjectID, cfg, logger)
+		if err != nil {
+			logger.Error("Failed to create text-to-speech service", "error", err)
+		}
+	} else {
+		logger.Error("GCP Project ID not configured for text-to-speech", "error", "GCP_PROJECT_ID environment variable not set")
+	}
+
 	// Create Gin engine
 	r := gin.New()
 
@@ -527,6 +539,57 @@ func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 
 			c.JSON(http.StatusOK, response)
 		})
+
+		v1.POST("/text-to-speech", func(c *gin.Context) {
+			// Check if text-to-speech service is available
+			if textToSpeechService == nil {
+				c.JSON(http.StatusServiceUnavailable, models.TextToSpeechError{
+					Error:   "Text-to-speech service unavailable",
+					Message: "GCP Text-to-Speech service is not configured. Please set GCP_PROJECT_ID environment variable.",
+					Code:    "SERVICE_UNAVAILABLE",
+				})
+				return
+			}
+
+			// Parse request
+			var req models.TextToSpeechRequest
+			if err := c.ShouldBindJSON(&req); err != nil {
+				c.JSON(http.StatusBadRequest, models.TextToSpeechError{
+					Error:   "Invalid request",
+					Message: err.Error(),
+					Code:    "INVALID_REQUEST",
+				})
+				return
+			}
+
+			// Validate texts
+			if err := textToSpeechService.ValidateTexts(req.Texts); err != nil {
+				c.JSON(http.StatusBadRequest, models.TextToSpeechError{
+					Error:   "Invalid texts",
+					Message: err.Error(),
+					Code:    "INVALID_TEXTS",
+				})
+				return
+			}
+
+			// Generate unique request ID
+			requestID := generateUniqueFileName("request")
+
+			// Generate audio files
+			ctx := context.Background()
+			response, err := textToSpeechService.GenerateAudioFiles(ctx, requestID, req.Texts)
+			if err != nil {
+				logger.Error("Text-to-speech generation failed", "error", err)
+				c.JSON(http.StatusInternalServerError, models.TextToSpeechError{
+					Error:   "Audio generation failed",
+					Message: "Unable to generate audio files. Please try again.",
+					Code:    "GENERATION_FAILED",
+				})
+				return
+			}
+
+			c.JSON(http.StatusOK, response)
+		})
 	}
 
 	// Root endpoint
@@ -539,6 +602,7 @@ func NewRouter(cfg *config.Config, logger *util.Logger) *gin.Engine {
 				"text-translate":        "/api/v1/text-translate",
 				"audio-language-detect": "/api/v1/audio-language-detect",
 				"speech-to-text":        "/api/v1/speech-to-text",
+				"text-to-speech":        "/api/v1/text-to-speech",
 			},
 		}
 		c.JSON(http.StatusOK, response)

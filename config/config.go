@@ -19,6 +19,7 @@ type Config struct {
 	LogPath                string `json:"log_path"`
 	LanguageDictionaryPath string `json:"language_dictionary_path"`
 	GeminiAPIKey           string `json:"gemini_api_key"`
+	AudioDBPath            string `json:"audio_db_path"`
 }
 
 // Load loads configuration from environment variables and .env file
@@ -29,7 +30,7 @@ func Load() (*Config, error) {
 	}
 
 	config := &Config{
-		Port:                   getEnvAsInt("PORT", 5001),
+		Port:                   getEnvAsInt("PORT", 8080),
 		Environment:            getEnv("ENVIRONMENT", "development"),
 		ReadTimeout:            getEnvAsInt("READ_TIMEOUT", 10),
 		WriteTimeout:           getEnvAsInt("WRITE_TIMEOUT", 10),
@@ -38,6 +39,7 @@ func Load() (*Config, error) {
 		LogPath:                getEnv("LOG_PATH", "./log/isl-api-server.log"),
 		LanguageDictionaryPath: getEnv("LANGUAGE_DICTIONARY_PATH", "./config/language_dictionary"),
 		GeminiAPIKey:           getEnv("GEMINI_API_KEY", ""),
+		AudioDBPath:            getEnv("AUDIO_DB_PATH", "./audiodb"),
 	}
 
 	return config, nil

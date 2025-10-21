@@ -28,6 +28,9 @@ config/credentials/*.json
 log/
 *.log
 
+# Audio database
+audiodb/
+
 # IDE files
 .vscode/
 .idea/
