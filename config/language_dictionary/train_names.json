@@ -1,0 +1,45 @@
+{
+    "metadata": {
+        "version": "1.0.0",
+        "created": "2025-01-19",
+        "description": "Train name mappings for correct translation across languages",
+        "languages": [
+            "en",
+            "hi",
+            "mr",
+            "gu"
+        ]
+    },
+    "train_names": {
+        "Tata": {
+            "en": "Tejas",
+            "hi": "तेजस",
+            "mr": "तेजस",
+            "gu": "તેજસ"
+        },
+        "Tejas": {
+            "en": "Tejas",
+            "hi": "तेजस",
+            "mr": "तेजस",
+            "gu": "તેજસ"
+        },
+        "टाटा": {
+            "en": "Tejas",
+            "hi": "तेजस",
+            "mr": "तेजस",
+            "gu": "તેજસ"
+        },
+        "ટાટા": {
+            "en": "Tejas",
+            "hi": "तेजस",
+            "mr": "तेजस",
+            "gu": "તેજસ"
+        },
+        "टेटस": {
+            "en": "Tejas",
+            "hi": "तेजस",
+            "mr": "तेजस",
+            "gu": "તેજસ"
+        }
+    }
+}

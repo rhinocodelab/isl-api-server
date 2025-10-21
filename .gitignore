@@ -20,9 +20,8 @@ go.work
 # Environment variables
 .env
 
-# GCP Credentials
-config/credentials/*.json
-*.json
+# GCP Credentials (exclude only credentials folder)
+config/credentials/
 
 # Log files
 log/

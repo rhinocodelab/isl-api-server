@@ -1,0 +1,135 @@
+{
+    "metadata": {
+        "version": "1.0.0",
+        "created": "2025-01-19",
+        "description": "Greetings and polite expressions in English, Hindi, Marathi, and Gujarati",
+        "languages": [
+            "en",
+            "hi",
+            "mr",
+            "gu"
+        ]
+    },
+    "greetings": {
+        "good_morning": {
+            "en": "good morning",
+            "hi": "सुप्रभात",
+            "mr": "सुप्रभात",
+            "gu": "સુપ્રભાત"
+        },
+        "good_afternoon": {
+            "en": "good afternoon",
+            "hi": "नमस्कार",
+            "mr": "नमस्कार",
+            "gu": "નમસ્કાર"
+        },
+        "good_evening": {
+            "en": "good evening",
+            "hi": "शुभ संध्या",
+            "mr": "शुभ संध्या",
+            "gu": "શુભ સાંજ"
+        },
+        "good_night": {
+            "en": "good night",
+            "hi": "शुभ रात्रि",
+            "mr": "शुभ रात्रि",
+            "gu": "શુભ રાત્રી"
+        },
+        "how_are_you": {
+            "en": "how are you",
+            "hi": "आप कैसे हैं",
+            "mr": "तुम्ही कसे आहात",
+            "gu": "તમે કેમ છો"
+        },
+        "i_am_fine": {
+            "en": "I am fine",
+            "hi": "मैं ठीक हूँ",
+            "mr": "मी ठीक आहे",
+            "gu": "હું ઠીક છું"
+        },
+        "nice_to_meet_you": {
+            "en": "nice to meet you",
+            "hi": "आपसे मिलकर खुशी हुई",
+            "mr": "तुम्हाला भेटून आनंद झाला",
+            "gu": "તમને મળીને આનંદ થયો"
+        },
+        "welcome": {
+            "en": "welcome",
+            "hi": "स्वागत है",
+            "mr": "स्वागत",
+            "gu": "સ્વાગત"
+        },
+        "congratulations": {
+            "en": "congratulations",
+            "hi": "बधाई हो",
+            "mr": "अभिनंदन",
+            "gu": "અભિનંદન"
+        },
+        "happy_birthday": {
+            "en": "happy birthday",
+            "hi": "जन्मदिन मुबारक",
+            "mr": "वाढदिवसाच्या हार्दिक शुभेच्छा",
+            "gu": "જન્મદિવસની શુભકામના"
+        },
+        "happy_new_year": {
+            "en": "happy new year",
+            "hi": "नया साल मुबारक",
+            "mr": "नवीन वर्षाच्या शुभेच्छा",
+            "gu": "નવા વર્ષની શુભકામના"
+        },
+        "merry_christmas": {
+            "en": "merry christmas",
+            "hi": "क्रिसमस की शुभकामनाएं",
+            "mr": "ख्रिस्तमसच्या शुभेच्छा",
+            "gu": "ક્રિસમસની શુભકામના"
+        },
+        "excuse_me": {
+            "en": "excuse me",
+            "hi": "माफ करें",
+            "mr": "माफ करा",
+            "gu": "માફ કરશો"
+        },
+        "sorry": {
+            "en": "sorry",
+            "hi": "माफ करें",
+            "mr": "माफ करा",
+            "gu": "માફ કરશો"
+        },
+        "pardon": {
+            "en": "pardon",
+            "hi": "माफ करें",
+            "mr": "माफ करा",
+            "gu": "માફ કરશો"
+        },
+        "bless_you": {
+            "en": "bless you",
+            "hi": "भगवान आपका भला करे",
+            "mr": "देव तुमचे कल्याण करो",
+            "gu": "ભગવાન તમારું કલ્યાણ કરે"
+        },
+        "good_luck": {
+            "en": "good luck",
+            "hi": "शुभकामनाएं",
+            "mr": "शुभेच्छा",
+            "gu": "શુભકામના"
+        },
+        "take_care": {
+            "en": "take care",
+            "hi": "अपना ख्याल रखें",
+            "mr": "स्वतःची काळजी घ्या",
+            "gu": "તમારી કાળજી લો"
+        },
+        "see_you_later": {
+            "en": "see you later",
+            "hi": "बाद में मिलते हैं",
+            "mr": "नंतर भेटू",
+            "gu": "પછી મળીશું"
+        },
+        "have_a_good_day": {
+            "en": "have a good day",
+            "hi": "आपका दिन शुभ हो",
+            "mr": "तुमचा दिवस शुभ असो",
+            "gu": "તમારો દિવસ શુભ રહે"
+        }
+    }
+}

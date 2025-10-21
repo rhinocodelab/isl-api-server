@@ -147,12 +147,10 @@ func (t *TranslationService) TranslateToMultipleLanguagesConcurrent(ctx context.
 			// Convert numbers to words before translation
 			processedText := t.convertNumbersToWords(text, lang)
 
-			translatedText, err := t.TranslateText(translationCtx, processedText, sourceLang, lang)
+			// Apply train name correction before translation
+			processedText = t.CorrectTrainNames(processedText, lang)
 
-			// Apply train name correction after translation
-			if err == nil {
-				translatedText = t.correctTrainNames(translatedText, lang)
-			}
+			translatedText, err := t.TranslateText(translationCtx, processedText, sourceLang, lang)
 
 			// Thread-safe access to shared data
 			mu.Lock()
@@ -280,8 +278,8 @@ func (t *TranslationService) convertNumbersToWords(text, targetLang string) stri
 	return text
 }
 
-// correctTrainNames corrects train names using the dictionary
-func (t *TranslationService) correctTrainNames(text, targetLang string) string {
+// CorrectTrainNames corrects train names using the dictionary
+func (t *TranslationService) CorrectTrainNames(text, targetLang string) string {
 	if t.trainNamesDict == nil {
 		// No dictionary available, return original text
 		return text
@@ -296,9 +294,12 @@ func (t *TranslationService) correctTrainNames(text, targetLang string) string {
 		if strings.Contains(strings.ToLower(text), strings.ToLower(trainName)) {
 			// Get the correct translation for the target language
 			if correctName, exists := translations[shortLang]; exists {
-				// Replace the train name with the correct translation
-				text = strings.Replace(text, trainName, correctName, -1)
-				t.logger.Info("Train name corrected", "original", trainName, "corrected", correctName, "target_lang", targetLang)
+				// Only replace if the correct name is different from what's in the text
+				if correctName != trainName {
+					// Replace the train name with the correct translation
+					text = strings.Replace(text, trainName, correctName, -1)
+					t.logger.Info("Train name corrected", "original", trainName, "corrected", correctName, "target_lang", targetLang)
+				}
 			}
 		}
 

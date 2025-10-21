@@ -1,0 +1,207 @@
+{
+    "metadata": {
+        "version": "1.0.0",
+        "created": "2025-01-19",
+        "description": "Common words translations in English, Hindi, Marathi, and Gujarati",
+        "languages": [
+            "en",
+            "hi",
+            "mr",
+            "gu"
+        ]
+    },
+    "words": {
+        "hello": {
+            "en": "hello",
+            "hi": "नमस्ते",
+            "mr": "नमस्कार",
+            "gu": "નમસ્તે"
+        },
+        "goodbye": {
+            "en": "goodbye",
+            "hi": "अलविदा",
+            "mr": "निरोप",
+            "gu": "આવજો"
+        },
+        "thank_you": {
+            "en": "thank you",
+            "hi": "धन्यवाद",
+            "mr": "धन्यवाद",
+            "gu": "આભાર"
+        },
+        "please": {
+            "en": "please",
+            "hi": "कृपया",
+            "mr": "कृपया",
+            "gu": "કૃપા કરીને"
+        },
+        "yes": {
+            "en": "yes",
+            "hi": "हाँ",
+            "mr": "हो",
+            "gu": "હા"
+        },
+        "no": {
+            "en": "no",
+            "hi": "नहीं",
+            "mr": "नाही",
+            "gu": "ના"
+        },
+        "water": {
+            "en": "water",
+            "hi": "पानी",
+            "mr": "पाणी",
+            "gu": "પાણી"
+        },
+        "food": {
+            "en": "food",
+            "hi": "भोजन",
+            "mr": "अन्न",
+            "gu": "ખોરાક"
+        },
+        "home": {
+            "en": "home",
+            "hi": "घर",
+            "mr": "घर",
+            "gu": "ઘર"
+        },
+        "family": {
+            "en": "family",
+            "hi": "परिवार",
+            "mr": "कुटुंब",
+            "gu": "કુટુંબ"
+        },
+        "mother": {
+            "en": "mother",
+            "hi": "माँ",
+            "mr": "आई",
+            "gu": "મા"
+        },
+        "father": {
+            "en": "father",
+            "hi": "पिता",
+            "mr": "बाबा",
+            "gu": "પિતા"
+        },
+        "brother": {
+            "en": "brother",
+            "hi": "भाई",
+            "mr": "भाऊ",
+            "gu": "ભાઈ"
+        },
+        "sister": {
+            "en": "sister",
+            "hi": "बहन",
+            "mr": "बहीण",
+            "gu": "બહેન"
+        },
+        "friend": {
+            "en": "friend",
+            "hi": "दोस्त",
+            "mr": "मित्र",
+            "gu": "મિત્ર"
+        },
+        "love": {
+            "en": "love",
+            "hi": "प्यार",
+            "mr": "प्रेम",
+            "gu": "પ્રેમ"
+        },
+        "happy": {
+            "en": "happy",
+            "hi": "खुश",
+            "mr": "आनंदी",
+            "gu": "ખુશ"
+        },
+        "sad": {
+            "en": "sad",
+            "hi": "उदास",
+            "mr": "दुःखी",
+            "gu": "ઉદાસ"
+        },
+        "beautiful": {
+            "en": "beautiful",
+            "hi": "सुंदर",
+            "mr": "सुंदर",
+            "gu": "સુંદર"
+        },
+        "good": {
+            "en": "good",
+            "hi": "अच्छा",
+            "mr": "चांगले",
+            "gu": "સારું"
+        },
+        "bad": {
+            "en": "bad",
+            "hi": "बुरा",
+            "mr": "वाईट",
+            "gu": "ખરાબ"
+        },
+        "big": {
+            "en": "big",
+            "hi": "बड़ा",
+            "mr": "मोठे",
+            "gu": "મોટું"
+        },
+        "small": {
+            "en": "small",
+            "hi": "छोटा",
+            "mr": "छोटे",
+            "gu": "નાનું"
+        },
+        "hot": {
+            "en": "hot",
+            "hi": "गर्म",
+            "mr": "गरम",
+            "gu": "ગરમ"
+        },
+        "cold": {
+            "en": "cold",
+            "hi": "ठंडा",
+            "mr": "थंड",
+            "gu": "ઠંડું"
+        },
+        "day": {
+            "en": "day",
+            "hi": "दिन",
+            "mr": "दिवस",
+            "gu": "દિવસ"
+        },
+        "night": {
+            "en": "night",
+            "hi": "रात",
+            "mr": "रात्र",
+            "gu": "રાત"
+        },
+        "morning": {
+            "en": "morning",
+            "hi": "सुबह",
+            "mr": "सकाळ",
+            "gu": "સવાર"
+        },
+        "evening": {
+            "en": "evening",
+            "hi": "शाम",
+            "mr": "संध्याकाळ",
+            "gu": "સાંજ"
+        },
+        "today": {
+            "en": "today",
+            "hi": "आज",
+            "mr": "आज",
+            "gu": "આજે"
+        },
+        "tomorrow": {
+            "en": "tomorrow",
+            "hi": "कल",
+            "mr": "उद्या",
+            "gu": "કાલે"
+        },
+        "yesterday": {
+            "en": "yesterday",
+            "hi": "कल",
+            "mr": "काल",
+            "gu": "ગઈકાલે"
+        }
+    }
+}
